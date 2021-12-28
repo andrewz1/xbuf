@@ -2,27 +2,28 @@ package xbuf
 
 import (
 	"encoding/binary"
-
-	"github.com/valyala/bytebufferpool"
+	"sync"
 )
 
 type RB struct {
-	*bytebufferpool.ByteBuffer
-	p int  // ptr
-	l int  // left
-	n bool // nested flag
+	b []byte // buf data
+	p int    // buff ptr
+	l int    // bytes left
+	n bool   // nested buffer flag
 }
 
 var (
-	rbp bytebufferpool.Pool
+	rbp = sync.Pool{
+		New: func() interface{} {
+			return &RB{b: make([]byte, 0)}
+		},
+	}
 )
 
 func GetRB(b []byte) *RB {
-	rb := &RB{
-		ByteBuffer: rbp.Get(),
-	}
+	rb := rbp.Get().(*RB)
 	if len(b) > 0 {
-		rb.set(b)
+		rb.b = append(rb.b, b...)
 	}
 	return rb
 }
@@ -32,13 +33,21 @@ func PutRB(rb *RB) {
 		return
 	}
 	rb.Reset()
-	rbp.Put(rb.ByteBuffer)
+	rbp.Put(rb)
 }
 
 func (rb *RB) Reset() {
-	rb.ByteBuffer.Reset()
+	rb.b = rb.b[:0]
 	rb.p = 0
 	rb.l = 0
+}
+
+func (rb *RB) Len() int {
+	return len(rb.b)
+}
+
+func (rb *RB) Ptr() int {
+	return rb.p
 }
 
 func (rb *RB) Left() int {
@@ -49,22 +58,14 @@ func (rb *RB) Append(b []byte) {
 	if len(b) == 0 {
 		return
 	}
-	rb.B = append(rb.B, b...)
+	rb.b = append(rb.b, b...)
 	rb.l += len(b)
 }
 
-func (rb *RB) set(b []byte) {
-	rb.ByteBuffer.Set(b)
+func (rb *RB) Set(b []byte) {
+	rb.b = append(rb.b[:0], b...)
 	rb.p = 0
 	rb.l = len(b)
-}
-
-func (rb *RB) Set(b []byte) {
-	if len(b) == 0 {
-		rb.Reset()
-		return
-	}
-	rb.set(b)
 }
 
 func (rb *RB) shift(n int) {
@@ -88,7 +89,7 @@ func (rb *RB) GetU8() (byte, bool) {
 		return 0, false
 	}
 	defer rb.shift(1)
-	return rb.B[rb.p], true
+	return rb.b[rb.p], true
 }
 
 func (rb *RB) MustGetU8() byte {
@@ -101,7 +102,7 @@ func (rb *RB) GetU16() (uint16, bool) {
 		return 0, false
 	}
 	defer rb.shift(2)
-	return binary.BigEndian.Uint16(rb.B[rb.p:]), true
+	return binary.BigEndian.Uint16(rb.b[rb.p:]), true
 }
 
 func (rb *RB) MustGetU16() uint16 {
@@ -115,7 +116,7 @@ func (rb *RB) GetU24() (uint32, bool) {
 	}
 	defer rb.shift(3)
 	var t [4]byte
-	copy(t[1:], rb.B[rb.p:])
+	copy(t[1:], rb.b[rb.p:])
 	return binary.BigEndian.Uint32(t[:]), true
 }
 
@@ -129,7 +130,7 @@ func (rb *RB) GetU32() (uint32, bool) {
 		return 0, false
 	}
 	defer rb.shift(4)
-	return binary.BigEndian.Uint32(rb.B[rb.p:]), true
+	return binary.BigEndian.Uint32(rb.b[rb.p:]), true
 }
 
 func (rb *RB) MustGetU32() uint32 {
@@ -142,7 +143,7 @@ func (rb *RB) GetU64() (uint64, bool) {
 		return 0, false
 	}
 	defer rb.shift(8)
-	return binary.BigEndian.Uint64(rb.B[rb.p:]), true
+	return binary.BigEndian.Uint64(rb.b[rb.p:]), true
 }
 
 func (rb *RB) MustGetU64() uint64 {
@@ -158,7 +159,7 @@ func (rb *RB) bytes(n int) []byte {
 		return make([]byte, 0)
 	default:
 		defer rb.shift(n)
-		return rb.B[rb.p : rb.p+n]
+		return rb.b[rb.p : rb.p+n]
 	}
 }
 
@@ -216,9 +217,9 @@ func (rb *RB) SkipL16() (ok bool) {
 
 func (rb *RB) nestedRB(n int) *RB {
 	return &RB{
-		ByteBuffer: &bytebufferpool.ByteBuffer{B: rb.bytes(n)},
-		l:          n,
-		n:          true,
+		b: rb.bytes(n),
+		l: n,
+		n: true,
 	}
 }
 

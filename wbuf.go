@@ -2,57 +2,63 @@ package xbuf
 
 import (
 	"encoding/binary"
-
-	"github.com/valyala/bytebufferpool"
+	"sync"
 )
 
 type WB struct {
-	*bytebufferpool.ByteBuffer
+	b []byte
 }
 
 var (
-	wbp bytebufferpool.Pool
+	wbp = sync.Pool{
+		New: func() interface{} {
+			return &WB{b: make([]byte, 0)}
+		},
+	}
 )
 
 func GetWB() *WB {
-	return &WB{
-		ByteBuffer: wbp.Get(),
-	}
+	return wbp.Get().(*WB)
 }
 
 func PutWB(wb *WB) {
 	if wb == nil {
 		return
 	}
-	wbp.Put(wb.ByteBuffer)
+	wb.Reset()
+	wbp.Put(wb)
+}
+
+func (wb *WB) Reset() {
+	wb.b = wb.b[:0]
 }
 
 func (wb *WB) PutU8(v byte) {
-	wb.B = append(wb.B, v)
+	wb.b = append(wb.b, v)
 }
 
 func (wb *WB) PutU16(v uint16) {
-	var buf [2]byte
-	binary.BigEndian.PutUint16(buf[:], v)
-	wb.B = append(wb.B, buf[:]...)
+	buf := make([]byte, 2)
+	binary.BigEndian.PutUint16(buf, v)
+	wb.b = append(wb.b, buf...)
 }
 
 func (wb *WB) PutU32(v uint32) {
-	var buf [4]byte
-	binary.BigEndian.PutUint32(buf[:], v)
-	wb.B = append(wb.B, buf[:]...)
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, v)
+	wb.b = append(wb.b, buf...)
 }
 
 func (wb *WB) PutU64(v uint64) {
-	var buf [8]byte
-	binary.BigEndian.PutUint64(buf[:], v)
-	wb.B = append(wb.B, buf[:]...)
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, v)
+	wb.b = append(wb.b, buf...)
 }
 
 func (wb *WB) PutBytes(v []byte) {
-	wb.B = append(wb.B, v...)
+	wb.b = append(wb.b, v...)
 }
 
 func (wb *WB) PutZeros(c int) {
-	wb.B = append(wb.B, make([]byte, c)...)
+	wb.b = append(wb.b, make([]byte, c)...)
 }
