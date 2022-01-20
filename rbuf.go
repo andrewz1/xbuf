@@ -270,3 +270,7 @@ func (rb *RB) GetBuf(n int) []byte {
 	}
 	return append([]byte{}, rb.b[:n]...)
 }
+
+func (rb *RB) String() string {
+	return string(rb.b)
+}
