@@ -263,3 +263,10 @@ func (rb *RB) GetNestedL16() (nb *RB, ok bool) {
 	nb, ok = rb.GetNested(int(n))
 	return
 }
+
+func (rb *RB) GetBuf(n int) []byte {
+	if n > len(rb.b) {
+		return nil
+	}
+	return append([]byte{}, rb.b[:n]...)
+}
