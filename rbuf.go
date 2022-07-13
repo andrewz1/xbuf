@@ -24,6 +24,7 @@ func GetRB(b []byte) *RB {
 	rb := rbp.Get().(*RB)
 	if len(b) > 0 {
 		rb.b = append(rb.b, b...)
+		rb.l = len(b)
 	}
 	return rb
 }
