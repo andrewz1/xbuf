@@ -62,3 +62,15 @@ func (wb *WB) PutBytes(v []byte) {
 func (wb *WB) PutZeros(c int) {
 	wb.b = append(wb.b, make([]byte, c)...)
 }
+
+func (wb *WB) Len() int {
+	return len(wb.b)
+}
+
+func (wb *WB) Bytes() []byte {
+	return wb.b
+}
+
+func (wb *WB) GetBytes() []byte {
+	return append([]byte(nil), wb.b...)
+}
